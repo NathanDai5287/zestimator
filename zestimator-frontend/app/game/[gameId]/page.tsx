@@ -235,17 +235,17 @@ export default function GamePage() {
         <div className="row" style={{ marginTop: 10 }}>
           <span className="status-chip">Phase: {game.status}</span>
           {me && (
-            <span className="status-chip" style={{ background: 'rgba(61, 216, 255, 0.16)', color: '#9cecff' }}>
+            <span className="status-chip status-chip-role">
               {me.name} · {isMarketMaker ? 'Market Maker' : isHost ? 'Host' : 'Player'}
             </span>
           )}
           {me && (
-            <span className="status-chip" style={{ background: 'rgba(78, 224, 149, 0.15)', color: '#b2ffd4' }}>
+            <span className="status-chip status-chip-pl">
               P/L {fmt(me.balance)}
             </span>
           )}
           {phaseSecondsLeft != null && (
-            <span className="status-chip" style={{ background: 'rgba(255, 213, 123, 0.16)', color: '#ffe0a2' }}>
+            <span className="status-chip status-chip-time">
               Time Left: {phaseSecondsLeft}s
             </span>
           )}

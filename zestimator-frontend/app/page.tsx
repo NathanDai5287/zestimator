@@ -66,11 +66,11 @@ export default function Home() {
   }
 
   return (
-    <main className="page-shell" style={{ maxWidth: 740 }}>
+    <main className="page-shell" style={{ maxWidth: 980 }}>
       <section className="panel" style={{ padding: 24 }}>
-        <p className="kicker">Trade or Tighten</p>
+        <p className="kicker">Real-Time Property Market</p>
         <h1 className="title" style={{ marginTop: 8 }}>Zestimator</h1>
-        <p className="subtitle">Join real players and make two-sided markets on live property listings.</p>
+        <p className="subtitle">Join real players and quote homes in a fast trading room, marketplace style.</p>
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
