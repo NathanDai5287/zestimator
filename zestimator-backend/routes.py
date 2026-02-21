@@ -71,11 +71,20 @@ def _game_state(game, reveal_price=False):
     if not reveal_price:
         house.pop("price", None)
 
+    # Expose the agreed spread (winning auction bid) once a market maker is selected
+    agreed_spread = None
+    mm_player = next((p for p in game.players if p.is_market_maker), None)
+    if mm_player:
+        mm_bid = AuctionBid.query.filter_by(game_id=game.id, player_id=mm_player.id).first()
+        if mm_bid:
+            agreed_spread = mm_bid.spread
+
     return {
         "id": game.id,
         "status": game.status,
         "house": house,
         "trueValue": game.true_value if reveal_price else None,
+        "agreedSpread": agreed_spread,
         "marketBid": game.market_bid,
         "marketAsk": game.market_ask,
         "players": players,
@@ -184,31 +193,26 @@ def submit_bid(game_id):
         return jsonify({"error": "Game is not in auction phase"}), 409
 
     body = request.get_json(silent=True) or {}
-    bid_price = body.get("bid")
-    ask_price = body.get("ask")
+    spread = body.get("spread")
 
-    if bid_price is None or ask_price is None:
-        return jsonify({"error": "bid and ask are required"}), 400
-    if ask_price <= bid_price:
-        return jsonify({"error": "ask must be greater than bid"}), 400
-
-    bid_price = float(bid_price)
-    ask_price = float(ask_price)
-    spread = ask_price - bid_price
+    if spread is None:
+        return jsonify({"error": "spread is required"}), 400
+    spread = float(spread)
+    if spread <= 0:
+        return jsonify({"error": "spread must be positive"}), 400
 
     # Upsert: update existing bid or create new one
+    # bid_price/ask_price are placeholders; the actual quotes are set in the quoting phase
     existing = AuctionBid.query.filter_by(game_id=game_id, player_id=g.player.id).first()
     if existing:
-        existing.bid_price = bid_price
-        existing.ask_price = ask_price
         existing.spread = spread
         existing.submitted_at = datetime.utcnow()
     else:
         existing = AuctionBid(
             game_id=game_id,
             player_id=g.player.id,
-            bid_price=bid_price,
-            ask_price=ask_price,
+            bid_price=0.0,
+            ask_price=spread,
             spread=spread,
         )
         db.session.add(existing)
@@ -239,22 +243,56 @@ def finish_auction(game_id):
     winner = Player.query.get(winner_bid.player_id)
     winner.is_market_maker = True
 
-    game.market_bid = winner_bid.bid_price
-    game.market_ask = winner_bid.ask_price
-    game.status = "trading"
+    game.status = "quoting"
     db.session.commit()
 
     socketio.emit("market_maker_selected", {
         "playerName": winner.name,
-        "bid": game.market_bid,
-        "ask": game.market_ask,
+        "spread": winner_bid.spread,
     }, room=game_id)
 
     return jsonify({
         "marketMaker": winner.name,
-        "bid": game.market_bid,
-        "ask": game.market_ask,
+        "spread": winner_bid.spread,
     })
+
+
+@game_bp.route("/games/<game_id>/set-quotes", methods=["POST"])
+@require_token
+def set_quotes(game_id):
+    game = Game.query.get_or_404(game_id)
+    if game.status != "quoting":
+        return jsonify({"error": "Game is not in quoting phase"}), 409
+    if not g.player.is_market_maker:
+        return jsonify({"error": "Only the market maker can set quotes"}), 403
+
+    body = request.get_json(silent=True) or {}
+    bid_price = body.get("bid")
+    ask_price = body.get("ask")
+
+    if bid_price is None or ask_price is None:
+        return jsonify({"error": "bid and ask are required"}), 400
+
+    bid_price = float(bid_price)
+    ask_price = float(ask_price)
+
+    if ask_price <= bid_price:
+        return jsonify({"error": "ask must be greater than bid"}), 400
+
+    submitted_spread = ask_price - bid_price
+
+    # Enforce the agreed spread from the auction
+    mm_bid = AuctionBid.query.filter_by(game_id=game_id, player_id=g.player.id).first()
+    if mm_bid and abs(submitted_spread - mm_bid.spread) > 0.01:
+        return jsonify({"error": f"Spread must equal the agreed auction spread of {mm_bid.spread}"}), 400
+
+    game.market_bid = bid_price
+    game.market_ask = ask_price
+    game.status = "trading"
+    db.session.commit()
+
+    socketio.emit("quotes_set", {"bid": bid_price, "ask": ask_price}, room=game_id)
+    return jsonify({"bid": bid_price, "ask": ask_price})
 
 
 @game_bp.route("/games/<game_id>/trade", methods=["POST"])
