@@ -2,3 +2,8 @@ flask
 requests
 python-dotenv
 playwright
+flask-sqlalchemy
+flask-migrate
+flask-socketio
+flask-cors
+psycopg2-binary
