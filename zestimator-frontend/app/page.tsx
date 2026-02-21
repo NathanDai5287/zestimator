@@ -22,7 +22,10 @@ export default function Home() {
         body: JSON.stringify({ name: name.trim() || 'Host' }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? 'Failed to create game'); return; }
+      if (!res.ok) {
+        setError(data.error ?? 'Failed to create game');
+        return;
+      }
       localStorage.setItem(`token:${data.gameId}`, data.token);
       localStorage.setItem(`playerId:${data.gameId}`, data.playerId);
       router.push(`/game/${data.gameId}`);
@@ -35,7 +38,10 @@ export default function Home() {
 
   async function joinGame() {
     const rid = roomId.trim();
-    if (!rid) { setError('Enter a room ID'); return; }
+    if (!rid) {
+      setError('Enter a room ID');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -45,7 +51,10 @@ export default function Home() {
         body: JSON.stringify({ name: name.trim() || 'Player' }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? 'Failed to join game'); return; }
+      if (!res.ok) {
+        setError(data.error ?? 'Failed to join game');
+        return;
+      }
       localStorage.setItem(`token:${rid}`, data.token);
       localStorage.setItem(`playerId:${rid}`, data.playerId);
       router.push(`/game/${rid}`);
@@ -57,49 +66,62 @@ export default function Home() {
   }
 
   return (
-    <div style={{ padding: 24, fontFamily: 'monospace', maxWidth: 480 }}>
-      <h1>Zestimator</h1>
-      <p>Guess the house price. Compete to make the market.</p>
+    <main className="page-shell" style={{ maxWidth: 740 }}>
+      <section className="panel" style={{ padding: 24 }}>
+        <p className="kicker">Trade or Tighten</p>
+        <h1 className="title" style={{ marginTop: 8 }}>Zestimator</h1>
+        <p className="subtitle">Join real players and make two-sided markets on live property listings.</p>
+      </section>
 
-      <div style={{ marginBottom: 16 }}>
-        <label>
-          Your name:{' '}
-          <input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="enter name"
-            onKeyDown={e => e.key === 'Enter' && createGame()}
-          />
-        </label>
-      </div>
+      <section className="panel" style={{ marginTop: 14 }}>
+        <div className="row">
+          <div className="grow" style={{ minWidth: 220 }}>
+            <label htmlFor="name">Your name</label>
+            <input
+              id="name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Scott"
+              onKeyDown={e => e.key === 'Enter' && createGame()}
+            />
+          </div>
+        </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <button onClick={createGame} disabled={loading}>
-          Create New Game
-        </button>
-        <span style={{ marginLeft: 8, color: '#666', fontSize: 13 }}>you will be host</span>
-      </div>
+        <div className="two-col" style={{ marginTop: 14 }}>
+          <div className="panel" style={{ padding: 14, margin: 0 }}>
+            <p className="kicker">Host</p>
+            <h3 className="title" style={{ marginTop: 8, fontSize: 22 }}>Create New Game</h3>
+            <p className="subtitle" style={{ marginTop: 6 }}>Start a room and become host for this session.</p>
+            <button className="btn" onClick={createGame} disabled={loading} style={{ marginTop: 10 }}>
+              Create Room
+            </button>
+          </div>
 
-      <hr style={{ margin: '16px 0' }} />
+          <div className="panel" style={{ padding: 14, margin: 0 }}>
+            <p className="kicker">Join</p>
+            <h3 className="title" style={{ marginTop: 8, fontSize: 22 }}>Enter Existing Room</h3>
+            <p className="subtitle" style={{ marginTop: 6 }}>Paste a room code shared by your host.</p>
+            <label htmlFor="roomId" style={{ marginTop: 10 }}>Room ID</label>
+            <input
+              id="roomId"
+              value={roomId}
+              onChange={e => setRoomId(e.target.value)}
+              placeholder="paste room id"
+              onKeyDown={e => e.key === 'Enter' && joinGame()}
+            />
+            <button className="btn btn-secondary" onClick={joinGame} disabled={loading} style={{ marginTop: 10 }}>
+              Join Room
+            </button>
+          </div>
+        </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <label>
-          Room ID:{' '}
-          <input
-            value={roomId}
-            onChange={e => setRoomId(e.target.value)}
-            placeholder="paste room id here"
-            style={{ width: 280 }}
-            onKeyDown={e => e.key === 'Enter' && joinGame()}
-          />
-        </label>
-      </div>
-      <button onClick={joinGame} disabled={loading}>
-        Join Game
-      </button>
-
-      {error && <p style={{ color: 'red', marginTop: 8 }}>{error}</p>}
-      {loading && <p style={{ color: '#666' }}>Loading (scraping house data, may take ~15s)...</p>}
-    </div>
+        {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
+        {loading && (
+          <p className="muted" style={{ marginTop: 10 }}>
+            Preparing game data. First load can take around 15 seconds.
+          </p>
+        )}
+      </section>
+    </main>
   );
 }
