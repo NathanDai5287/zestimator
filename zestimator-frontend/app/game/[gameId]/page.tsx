@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 const API = '/api';
-const WS_URL = 'http://localhost:5001';
+const WS_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:5001';
 
 // --- Types ---
 
