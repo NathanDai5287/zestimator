@@ -83,6 +83,22 @@ function playerName(game: GameState, playerId: string) {
   return game.players.find(p => p.id === playerId)?.name ?? 'Unknown';
 }
 
+function buildStreetViewEmbedUrl(streetViewUrl?: string | null): string | null {
+  if (!streetViewUrl) return null;
+  try {
+    const parsed = new URL(streetViewUrl);
+    const viewpoint = parsed.searchParams.get('viewpoint');
+    if (!viewpoint) {
+      return `${streetViewUrl}${streetViewUrl.includes('?') ? '&' : '?'}output=embed`;
+    }
+    return `https://www.google.com/maps?q=&layer=c&cbll=${encodeURIComponent(
+      viewpoint
+    )}&cbp=11,0,0,0,0&output=svembed`;
+  } catch {
+    return null;
+  }
+}
+
 // --- Main Component ---
 
 export default function GamePage() {
@@ -261,6 +277,7 @@ export default function GamePage() {
 
 function HouseInfo({ house }: { house: House }) {
   const photos = house.photos ?? [];
+  const streetViewEmbed = buildStreetViewEmbedUrl(house.streetViewUrl);
   return (
     <div style={{ borderTop: '1px solid #ccc', marginTop: 12, paddingTop: 12 }}>
       <h3 style={{ margin: '0 0 4px' }}>{house.address}</h3>
@@ -304,6 +321,22 @@ function HouseInfo({ house }: { house: House }) {
           </>
         )}
       </p>
+      {streetViewEmbed && (
+        <div style={{ marginTop: 10 }}>
+          <p style={{ margin: '0 0 6px' }}>
+            <strong>Street View Preview</strong>
+          </p>
+          <iframe
+            title="Street View"
+            src={streetViewEmbed}
+            width="100%"
+            height="260"
+            style={{ border: 0, borderRadius: 8 }}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+      )}
       {photos.length > 0 && (
         <div
           style={{
