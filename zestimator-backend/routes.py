@@ -1,4 +1,5 @@
 import uuid
+import threading
 from datetime import datetime
 from functools import wraps
 
@@ -9,6 +10,19 @@ from game_logic import calculate_pnl, calculate_market_maker_pnl, select_market_
 from scraper import get_random_house
 
 game_bp = Blueprint("game", __name__, url_prefix="/api")
+
+# In-memory cache for prefetched houses: game_id -> house dict
+_prefetch_cache: dict = {}
+
+
+def _prefetch_house(game_id: str) -> None:
+    """Background thread: scrape the next house and cache it."""
+    try:
+        house = get_random_house()
+        if house and not house.get("error") and house.get("price"):
+            _prefetch_cache[game_id] = house
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -292,6 +306,11 @@ def set_quotes(game_id):
     db.session.commit()
 
     socketio.emit("quotes_set", {"bid": bid_price, "ask": ask_price}, room=game_id)
+
+    # Kick off background scrape for the next round while players trade
+    if game_id not in _prefetch_cache:
+        threading.Thread(target=_prefetch_house, args=(game_id,), daemon=True).start()
+
     return jsonify({"bid": bid_price, "ask": ask_price})
 
 
@@ -365,3 +384,39 @@ def settle(game_id):
     socketio.emit("settled", state, room=game_id)
 
     return jsonify(state)
+
+
+@game_bp.route("/games/<game_id>/new-round", methods=["POST"])
+@require_token
+@require_host
+def new_round(game_id):
+    game = Game.query.get_or_404(game_id)
+    if game.status != "settlement":
+        return jsonify({"error": "Game must be in settlement to start a new round"}), 409
+
+    house = _prefetch_cache.pop(game_id, None)
+    if not house:
+        house = get_random_house()
+        if not house or house.get("error"):
+            return jsonify({"error": "Failed to scrape house data"}), 502
+
+    true_value = house.get("price")
+    if not true_value:
+        return jsonify({"error": "House has no price"}), 502
+
+    game.house_data = house
+    game.true_value = float(true_value)
+    game.status = "lobby"
+    game.market_bid = None
+    game.market_ask = None
+
+    for player in game.players:
+        player.is_market_maker = False
+
+    AuctionBid.query.filter_by(game_id=game_id).delete()
+    Trade.query.filter_by(game_id=game_id).delete()
+
+    db.session.commit()
+
+    socketio.emit("new_round", {"gameId": game_id}, room=game_id)
+    return jsonify({"status": "lobby"})

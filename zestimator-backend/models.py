@@ -25,7 +25,7 @@ class Player(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     game_id = db.Column(db.String(36), db.ForeignKey("games.id"), nullable=False)
     name = db.Column(db.String(100), nullable=False)
-    balance = db.Column(db.Float, nullable=False, default=10000.0)
+    balance = db.Column(db.Float, nullable=False, default=0.0)
     is_market_maker = db.Column(db.Boolean, default=False)
     is_host = db.Column(db.Boolean, default=False)
     token = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))

@@ -144,6 +144,7 @@ export default function GamePage() {
       socket.on('quotes_set', refresh);
       socket.on('new_trade', refresh);
       socket.on('settled', (state: GameState) => setGame(state));
+      socket.on('new_round', refresh);
     });
 
     return () => {
@@ -212,7 +213,7 @@ export default function GamePage() {
         {me && (
           <>
             {' | '}You: <strong>{me.name}</strong>
-            {' | '}Balance: <strong>{fmt(me.balance)}</strong>
+            {' | '}PNL: <strong>{fmt(me.balance)}</strong>
             {isMarketMaker && ' | Role: Market Maker'}
             {isHost && ' | Role: Host'}
           </>
@@ -250,7 +251,7 @@ export default function GamePage() {
         />
       )}
       {game.status === 'settlement' && (
-        <SettlementPanel game={game} myPlayerId={myPlayerId} />
+        <SettlementPanel game={game} myPlayerId={myPlayerId} isHost={isHost} apiCall={apiCall} />
       )}
     </div>
   );
@@ -279,7 +280,6 @@ function HouseInfo({ house }: { house: House }) {
         {[
           house.yearBuilt != null ? `Built ${house.yearBuilt}` : null,
           house.daysOnZillow != null ? `${house.daysOnZillow} days on Zillow` : null,
-          house.taxAssessedValue != null ? `Tax assessed: $${house.taxAssessedValue.toLocaleString()}` : null,
         ]
           .filter(Boolean)
           .join(' · ')}
@@ -338,7 +338,7 @@ function PlayerList({ game }: { game: GameState }) {
         <thead>
           <tr>
             <th style={{ textAlign: 'left', paddingRight: 20 }}>Name</th>
-            <th style={{ textAlign: 'right', paddingRight: 20 }}>Balance</th>
+            <th style={{ textAlign: 'right', paddingRight: 20 }}>PNL</th>
             <th style={{ textAlign: 'left' }}>Role</th>
           </tr>
         </thead>
@@ -513,23 +513,20 @@ function QuotingPanel({
   isMarketMaker: boolean;
   apiCall: ApiCall;
 }) {
-  const [bidVal, setBidVal] = useState('');
-  const [askVal, setAskVal] = useState('');
+  const [centerVal, setCenterVal] = useState('');
   const [loading, setLoading] = useState(false);
 
   const agreedSpread = game.agreedSpread;
-  const bidNum = parseFloat(bidVal);
-  const askNum = parseFloat(askVal);
-  const enteredSpread = !isNaN(bidNum) && !isNaN(askNum) ? askNum - bidNum : null;
-  const spreadMatch =
-    enteredSpread !== null && agreedSpread !== null
-      ? Math.abs(enteredSpread - agreedSpread) < 0.01
-      : false;
+  const centerNum = parseFloat(centerVal);
+  const half = agreedSpread != null ? agreedSpread / 2 : null;
+  const bidNum = half != null && !isNaN(centerNum) ? centerNum - half : null;
+  const askNum = half != null && !isNaN(centerNum) ? centerNum + half : null;
+  const ready = bidNum != null && askNum != null;
 
   const mm = game.players.find(p => p.isMarketMaker);
 
   async function setQuotes() {
-    if (isNaN(bidNum) || isNaN(askNum) || askNum <= bidNum) return;
+    if (!ready) return;
     setLoading(true);
     await apiCall('/set-quotes', { bid: bidNum, ask: askNum });
     setLoading(false);
@@ -546,36 +543,27 @@ function QuotingPanel({
       {isMarketMaker ? (
         <div style={{ marginTop: 8 }}>
           <p style={{ margin: '4px 0', color: '#555' }}>
-            Set your bid and ask. The difference must equal{' '}
-            <strong>{agreedSpread != null ? fmt(agreedSpread) : '?'}</strong>.
+            Enter your center price. Bid and ask will be set automatically.
           </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+            <span style={{ minWidth: 140, textAlign: 'right' }}>
+              {ready ? <>Bid: <strong>{fmt(bidNum!)}</strong></> : 'Bid: —'}
+            </span>
             <label>
-              Bid:{' '}
+              Mid:{' '}
               <input
                 type="number"
-                value={bidVal}
-                onChange={e => setBidVal(e.target.value)}
-                style={{ width: 110 }}
-                placeholder="e.g. 340000"
+                value={centerVal}
+                onChange={e => setCenterVal(e.target.value)}
+                style={{ width: 120 }}
+                placeholder="e.g. 350000"
+                onKeyDown={e => e.key === 'Enter' && setQuotes()}
               />
             </label>
-            <label>
-              Ask:{' '}
-              <input
-                type="number"
-                value={askVal}
-                onChange={e => setAskVal(e.target.value)}
-                style={{ width: 110 }}
-                placeholder="e.g. 360000"
-              />
-            </label>
-            {enteredSpread !== null && (
-              <span style={{ color: spreadMatch ? 'green' : 'red' }}>
-                spread: {fmt(enteredSpread)} {spreadMatch ? '✓' : `(need ${agreedSpread != null ? fmt(agreedSpread) : '?'})`}
-              </span>
-            )}
-            <button onClick={setQuotes} disabled={loading || isNaN(bidNum) || isNaN(askNum) || askNum <= bidNum}>
+            <span style={{ minWidth: 140 }}>
+              {ready ? <>Ask: <strong>{fmt(askNum!)}</strong></> : 'Ask: —'}
+            </span>
+            <button onClick={setQuotes} disabled={loading || !ready}>
               Set Quotes
             </button>
           </div>
@@ -692,11 +680,22 @@ function TradingPanel({
 function SettlementPanel({
   game,
   myPlayerId,
+  isHost,
+  apiCall,
 }: {
   game: GameState;
   myPlayerId: string;
+  isHost: boolean;
+  apiCall: ApiCall;
 }) {
+  const [loading, setLoading] = useState(false);
   const mm = game.players.find(p => p.isMarketMaker);
+
+  async function startNewRound() {
+    setLoading(true);
+    await apiCall('/new-round');
+    setLoading(false);
+  }
 
   return (
     <div style={{ borderTop: '1px solid #ccc', marginTop: 12, paddingTop: 12 }}>
@@ -753,7 +752,7 @@ function SettlementPanel({
         </table>
       )}
 
-      <h5 style={{ margin: '12px 0 4px' }}>Final Balances</h5>
+      <h5 style={{ margin: '12px 0 4px' }}>PNL</h5>
       <table style={{ borderCollapse: 'collapse' }}>
         <tbody>
           {game.players.map(p => (
@@ -765,15 +764,22 @@ function SettlementPanel({
                 {p.name}
                 {p.isMarketMaker ? ' (MM)' : ''}
               </td>
-              <td>{fmt(p.balance)}</td>
+              <td style={{ color: p.balance >= 0 ? 'green' : 'red' }}>
+                {pnlFmt(p.balance)}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <p style={{ marginTop: 12 }}>
-        <a href="/">Play again</a>
-      </p>
+      <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+        {isHost && (
+          <button onClick={startNewRound} disabled={loading}>
+            Next Round (new house)
+          </button>
+        )}
+        <a href="/">Leave game</a>
+      </div>
     </div>
   );
 }
