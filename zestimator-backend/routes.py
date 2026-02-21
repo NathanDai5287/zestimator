@@ -87,6 +87,14 @@ def _game_state(game, reveal_price=False):
 # Routes
 # ---------------------------------------------------------------------------
 
+@game_bp.route("/random-house", methods=["GET"])
+def random_house():
+    house = get_random_house()
+    if not house or house.get("error"):
+        return jsonify({"error": "Failed to scrape house data"}), 502
+    return jsonify(house)
+
+
 @game_bp.route("/games", methods=["POST"])
 def create_game():
     body = request.get_json(silent=True) or {}
