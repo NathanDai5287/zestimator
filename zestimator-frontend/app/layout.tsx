@@ -15,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <header className="site-header">
+        {/* <header className="site-header">
           <div className="site-header-inner">
             <Link href="/" className="brand-mark" aria-label="Zestimator home">
               <span className="brand-e">z</span>
@@ -28,7 +28,7 @@ export default function RootLayout({
               Start Playing
             </Link>
           </div>
-        </header>
+        </header> */}
         {children}
       </body>
     </html>
