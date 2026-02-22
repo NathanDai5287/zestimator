@@ -2,6 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+const HouseScene = dynamic(() => import('./components/HouseScene'), {
+  ssr: false,
+  loading: () => <div style={{ width: '100%', height: 180 }} />,
+});
 
 const API = '/api';
 
@@ -66,62 +72,70 @@ export default function Home() {
   }
 
   return (
-    <main className="page-shell" style={{ maxWidth: 980 }}>
-      <section className="panel" style={{ padding: 24 }}>
-        <p className="kicker">Real-Time Property Market</p>
-        <h1 className="title" style={{ marginTop: 8 }}>Zestimator</h1>
-        <p className="subtitle">Join real players and quote homes in a fast trading room, marketplace style.</p>
-      </section>
+    <div className="home-container">
+      <div className="home-inner">
+        <header className="home-header">
+          <HouseScene />
+          <h1 className="home-title">Zestimator</h1>
+          <p className="home-tagline">
+            Guess the house price. Compete to make the market.
+          </p>
+        </header>
 
-      <section className="panel" style={{ marginTop: 14 }}>
-        <div className="row">
-          <div className="grow" style={{ minWidth: 220 }}>
-            <label htmlFor="name">Your name</label>
-            <input
-              id="name"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="e.g. Scott"
-              onKeyDown={e => e.key === 'Enter' && createGame()}
-            />
-          </div>
+        <div className="home-name-row">
+          <label htmlFor="home-name">your name</label>
+          <input
+            id="home-name"
+            className="home-input"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="enter name"
+            onKeyDown={e => e.key === 'Enter' && createGame()}
+          />
         </div>
 
-        <div className="two-col" style={{ marginTop: 14 }}>
-          <div className="panel" style={{ padding: 14, margin: 0 }}>
-            <p className="kicker">Host</p>
-            <h3 className="title" style={{ marginTop: 8, fontSize: 22 }}>Create New Game</h3>
-            <p className="subtitle" style={{ marginTop: 6 }}>Start a room and become host for this session.</p>
-            <button className="btn" onClick={createGame} disabled={loading} style={{ marginTop: 10 }}>
+        <div className="home-actions">
+          <div className="home-action-col">
+            <span className="home-label">new game</span>
+            <p className="home-hint">Start a room. You&rsquo;ll be the host.</p>
+            <button
+              className="home-btn"
+              onClick={createGame}
+              disabled={loading}
+            >
               Create Room
             </button>
           </div>
 
-          <div className="panel" style={{ padding: 14, margin: 0 }}>
-            <p className="kicker">Join</p>
-            <h3 className="title" style={{ marginTop: 8, fontSize: 22 }}>Enter Existing Room</h3>
-            <p className="subtitle" style={{ marginTop: 6 }}>Paste a room code shared by your host.</p>
-            <label htmlFor="roomId" style={{ marginTop: 10 }}>Room ID</label>
+          <div className="home-divider" />
+
+          <div className="home-action-col">
+            <span className="home-label">join game</span>
+            <p className="home-hint">Paste a room code from your host.</p>
             <input
-              id="roomId"
+              className="home-input"
               value={roomId}
               onChange={e => setRoomId(e.target.value)}
-              placeholder="paste room id"
+              placeholder="room id"
               onKeyDown={e => e.key === 'Enter' && joinGame()}
             />
-            <button className="btn btn-secondary" onClick={joinGame} disabled={loading} style={{ marginTop: 10 }}>
+            <button
+              className="home-btn home-btn-outline"
+              onClick={joinGame}
+              disabled={loading}
+            >
               Join Room
             </button>
           </div>
         </div>
 
-        {error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}
+        {error && <p className="home-error">{error}</p>}
         {loading && (
-          <p className="muted" style={{ marginTop: 10 }}>
-            Preparing game data. First load can take around 15 seconds.
+          <p className="home-loading">
+            Scraping house data &mdash; this can take ~15 s&hellip;
           </p>
         )}
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
